@@ -7,6 +7,12 @@
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MobileCoreServices/MobileCoreServices.h>
 
+#define SYSTEM_VERSION_EQUAL_TO(v)                  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedSame)
+#define SYSTEM_VERSION_GREATER_THAN(v)              ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedDescending)
+#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v)  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+#define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
+#define SYSTEM_VERSION_LESS_THAN_OR_EQUAL_TO(v)     ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedDescending)
+
 static NSString *const kShareOptionMessage = @"message";
 static NSString *const kShareOptionSubject = @"subject";
 static NSString *const kShareOptionFiles = @"files";
@@ -304,12 +310,31 @@ static NSString *const kShareOptionUrl = @"url";
     if (SLComposeViewControllerResultCancelled == result) {
       CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"cancelled"];
       [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    } else if ([self isAvailableForSharing:command type:type]) {
-      CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:SLComposeViewControllerResultDone == result];
-      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    } else {
-      CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"not available"];
-      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    } else if (SLComposeViewControllerResultDone == result) {
+        
+        /*****
+         
+         From iOS 11: Apple removed access to 3rd party accounts (such as Facebook and Twitter) through the Settings App :
+         ([SLComposeViewController isAvailableForServiceType:SLServiceTypeFacebook]) is always returning NO
+         isAvailableForServiceType is automatically handle by ios
+         
+         *****/
+        
+        if (SYSTEM_VERSION_LESS_THAN(@"11.0")) {
+            // code here
+            if ([self isAvailableForSharing:command type:type]) {
+                CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:SLComposeViewControllerResultDone == result];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            } else {
+                CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"not available"];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            }
+        } else {
+            CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:SLComposeViewControllerResultDone == result];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        }
+
+        
     }
     // required for iOS6 (issues #162 and #167)
     [self.viewController dismissViewControllerAnimated:YES completion:nil];
